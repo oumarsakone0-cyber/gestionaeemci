@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "flowbite/src/themes/default";
+/* ou : @import "flowbite"; si installé via npm */
+
+@layer components {
+  /* Ajout de tes composants personnalisés ici si besoin */
+}
