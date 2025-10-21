@@ -529,6 +529,76 @@
         </div>
       </div>
     </div>
+    
+    <!-- MODAL DE MODIFICATION DU MEMBRE -->
+    <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
+      <div class="modal-container edit-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">Modifier le Membre</h3>
+          <button class="modal-close" @click="closeEditModal">×</button>
+        </div>
+
+        <form class="edit-form" @submit.prevent="updateMembre">
+          <div class="form-group">
+            <label>Matricule</label>
+            <input type="text" v-model="editMembreData.matricule" readonly />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nom</label>
+              <input type="text" v-model="editMembreData.nom" required />
+            </div>
+            <div class="form-group">
+              <label>Prénom</label>
+              <input type="text" v-model="editMembreData.prenom" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Poste</label>
+            <input type="text" v-model="editMembreData.poste" required />
+          </div>
+          <div class="form-group">
+            <label>Photo</label>
+            <input type="file" accept="image/*" @change="handleEditPhotoUpload" />
+            <div v-if="editMembreData.photo" class="photo-preview">
+              <img :src="editMembreData.photo" alt="Photo du membre" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Secrétariat Régional</label>
+            <select v-model="editMembreData.secretariat_poste" required>
+              <option value="">-- Sélectionner --</option>
+              <option v-for="region in secretariats" :key="region" :value="region">
+                {{ region }}
+              </option>
+            </select>
+          </div>
+
+
+          <div class="form-group">
+            <label>Sous-comité</label>
+            <input type="text" v-model="editMembreData.sousComite"  required />
+          </div>
+
+          <div class="form-group">
+            <label>Section</label>
+            <input type="text" v-model="editMembreData.section" required/>
+          </div>
+
+          <div class="form-group">
+            <label>Contact</label>
+            <input type="text" v-model="editMembreData.telephone"  required/>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="cancel-btn" @click="closeEditModal">Annuler</button>
+            <button type="submit" class="submit-btn" @click="updateMembre">💾 Enregistrer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -571,6 +641,9 @@ const pagination = ref({
 const showAddMembre = ref(false)
 const showViewModal = ref(false)
 const currentMembre = ref(null)
+const showEditModal = ref(false)
+const editMembreData = ref({})
+
 
 const newMembre = ref({
   matricule: '',
@@ -663,6 +736,7 @@ const loadMembres = async () => {
     loading.value = false
   }
 }
+
 
 const debouncedSearch = () => {
   clearTimeout(searchTimeout.value)
@@ -775,8 +849,50 @@ const viewMembre = (membre) => {
 }
 
 const editMembre = (membre) => {
-  console.log('Éditer membre:', membre)
+  editMembreData.value = { ...membre }
+  showEditModal.value = true
 }
+const closeEditModal = () => {
+  showEditModal.value = false
+  editMembreData.value = {}
+}
+
+const handleEditPhotoUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      editMembreData.value.photo = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+const updateMembre = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}?action=update_membre&id=${editMembreData.value.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editMembreData.value),
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.success) {
+      alert('✅ Modifications enregistrées avec succès !');
+      await loadMembres();
+      closeEditModal();
+    } else {
+      alert('❌ Erreur lors de la mise à jour : ' + (data.message || data.error));
+    }
+  } catch (err) {
+    console.error('Erreur updateMembre:', err);
+    alert('🚨 Une erreur est survenue lors de l’enregistrement.');
+  }
+};
+
 
 const deleteMembre = async (membre) => {
   if (confirm(`Êtes-vous sûr de vouloir supprimer ${membre.nom} ${membre.prenom} ?`)) {
@@ -1481,6 +1597,109 @@ const formatDateTime = (dateString) => {
   overflow-y: auto;
   width: 100%;
     max-width: 100%;
+}
+/* Modal globale pour édition */
+.edit-modal {
+  max-width: 600px; /* largeur */
+  width: 100%;
+  max-height: 80vh; /* hauteur maximale pour éviter de dépasser l'écran */
+  overflow-y: auto; /* scroll vertical si contenu trop grand */
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+}
+
+/* Contenu interne de la modal */
+.edit-modal .modal-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Champ photo avec preview */
+.edit-modal .photo-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+/* Input et select */
+.edit-modal input,
+.edit-modal select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.edit-modal input:focus,
+.edit-modal select:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+/* Boutons */
+.edit-modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.edit-modal .submit-btn {
+  background: #16a34a;
+  color: white;
+}
+
+.edit-modal .submit-btn:hover {
+  background: #15803d;
+}
+
+.edit-modal .cancel-btn {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+}
+
+.edit-modal .cancel-btn:hover {
+  background: #f3f4f6;
+}
+
+/* Photo et champs alignés proprement */
+.edit-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Responsive : champs sur une seule colonne sur petits écrans */
+@media (max-width: 500px) {
+  .edit-modal .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Photo Upload Preview */
+.edit-modal .photo-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.edit-modal .photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .add-form {
