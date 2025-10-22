@@ -83,6 +83,11 @@
             <span class="project-icon">🏛️</span>
             <span class="project-name">Ecole de Côte d'Ivoire</span>
           </router-link>
+
+          <router-link to="/aeemci_actualites" class="project-item" active-class="active">
+            <span class="project-icon">📰</span>
+            <span class="project-name">Actualités</span>
+          </router-link>
         </div>
       </div>
 
