@@ -42,6 +42,7 @@ import ActivitesCe from "../components/components/ActivitesCe.vue"
 import AeemciMateriel from "../components/components/Materiel.vue"
 import AeemciComptabilite from "../components/components/Comptabilite.vue"
 import AeemciEcoles from "../components/components/Ecoles.vue"
+import Questionnaire from "../components/components/Questionnaire.vue"
 
 const routes = [
   {
@@ -67,6 +68,15 @@ const routes = [
     path: "/restauration",
     name: "restauration",
     component: Restauration,
+    meta: {
+      requiresAuth: false,
+      hideNavigation: false,
+    },
+  },
+  {
+    path: "/questionnaire_site",
+    name: "questionnaire_site",
+    component: Questionnaire,
     meta: {
       requiresAuth: false,
       hideNavigation: false,
