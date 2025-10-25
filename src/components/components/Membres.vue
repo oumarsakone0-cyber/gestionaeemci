@@ -192,7 +192,7 @@
               <td>{{ membre.section || 'Non assignée' }}</td>
               <td class="contact-cell">
                 <div class="contact-info">
-                  <span class="contact-phone">📞 {{ membre.telephone }}</span>
+                  <span class="contact-phone">📞 {{ membre.contact }}</span>
                 </div>
               </td>
               <td>
@@ -314,7 +314,7 @@
           </div>
           <div class="form-group">
             <label>Téléphone *</label>
-            <input type="tel" v-model="newMembre.telephone" required placeholder="+223 XX XX XX XX" />
+            <input type="tel" v-model="newMembre.contact" required placeholder="+223 XX XX XX XX" />
           </div>
           <div class="form-group">
             <label>Secrétariat Régional *</label>
@@ -414,7 +414,7 @@
                   </div>
                   <div class="info-item-mini">
                     <i class="fas fa-phone"></i>
-                   Contact : <span>{{ currentMembre.telephone }}</span>
+                   Contact : <span>{{ currentMembre.contact }}</span>
                   </div>
                   <div class="info-item-mini" v-if="currentMembre.numero_wave">
                     <i class="fas fa-mobile-alt"></i>
@@ -588,7 +588,7 @@
 
           <div class="form-group">
             <label>Contact</label>
-            <input type="text" v-model="editMembreData.telephone"  required/>
+            <input type="text" v-model="editMembreData.contact"  required/>
           </div>
 
           <div class="form-actions">
@@ -650,7 +650,7 @@ const newMembre = ref({
   nom: '',
   prenom: '',
   email: '',
-  telephone: '',
+  contact: '',
   secretariatRegional: '',
   sousComite: '',
   section: '',
@@ -693,7 +693,7 @@ const loadMembres = async () => {
         nom: membre.nom,
         prenom: membre.prenom,
         email: membre.email,
-        telephone: membre.telephone || membre.contact,
+        contact: membre.contact || membre.contact,
         secretariatRegional: membre.region || membre.secretariat,
         sousComite: membre.sous_comite,
         section: membre.section,
@@ -830,7 +830,7 @@ const addMembre = async () => {
       nom: '',
       prenom: '',
       email: '',
-      telephone: '',
+      contact: '',
       secretariatRegional: '',
       sousComite: '',
       section: '',

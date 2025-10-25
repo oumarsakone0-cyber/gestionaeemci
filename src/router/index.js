@@ -42,6 +42,7 @@ import ActivitesCe from "../components/components/ActivitesCe.vue"
 import AeemciMateriel from "../components/components/Materiel.vue"
 import AeemciComptabilite from "../components/components/Comptabilite.vue"
 import AeemciEcoles from "../components/components/Ecoles.vue"
+import Actualites from "../components/components/actualités.vue"
 
 const routes = [
   {
@@ -211,6 +212,15 @@ const routes = [
     path: "/aeemci_ecoles",
     name: "aeemci_ecoles",
     component: AeemciEcoles,
+    meta: {
+      requiresAuth: false,
+      hideNavigation: false,
+    },
+  },
+  {
+    path: "/aeemci_actualites",
+    name: "aeemci_actualites",
+    component: Actualites,
     meta: {
       requiresAuth: false,
       hideNavigation: false,

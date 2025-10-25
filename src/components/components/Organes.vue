@@ -79,20 +79,20 @@
               <tr v-for="secretariat in secretariats" :key="secretariat.id" class="table-row">
                 <td class="name-cell">
                   <div class="entity-info">
-                    <div class="entity-avatar">{{ secretariat.nom.charAt(0) }}</div>
-                    <span class="entity-name">{{ secretariat.nom }}</span>
+                    <div class="entity-avatar">{{ secretariat.nom_secretariat }}</div>
+                    <span class="entity-name">{{ secretariat.nom_secretariat }}</span>
                   </div>
                 </td>
-                <td>{{ secretariat.region }}</td>
-                <td>👤 {{ secretariat.secretaire }}</td>
+                <td>{{ secretariat.region_secretariat }}</td>
+                <td>👤 {{ secretariat.sr }}</td>
                 <td class="email-cell"><span class="email-zone">{{ secretariat.email }}</span></td>
-                <td>{{ secretariat.contact }}</td>
+                <td>{{ secretariat.contact_sr }}</td>
                 <td>
-                  <span class="count-badge">{{ secretariat.sousComites }}</span>
+                  <span class="count-badge">{{ secretariat.id }}</span>
                 </td>
                 <td>
-                  <span class="status-badge" :class="secretariat.statut.toLowerCase()">
-                    {{ secretariat.statut }}
+                  <span class="status-badge">
+                    {{ secretariat.statut || 'Actif' }}
                   </span>
                 </td>
                 <td>
@@ -100,8 +100,9 @@
                     <button class="action-btn view" @click="viewEntity(secretariat, 'secretariat')">
                       👁️
                     </button>
-                    <button class="action-btn edit">✏️</button>
-                    <button class="action-btn delete">🗑️</button>
+                    <button class="action-btn edit" @click="editorg(secretariat)">✏️</button>
+                    <button class="action-btn delete" @click="deleteorg(secretariat)">🗑️</button>
+
                   </div>
                 </td>
               </tr>
@@ -200,6 +201,7 @@
         </div>
 
         <div class="table-container">
+          
           <table class="data-table">
             <thead>
               <tr>
@@ -243,6 +245,8 @@
               </tr>
             </tbody>
           </table>
+
+          
         </div>
       </div>
     </div>
@@ -477,16 +481,80 @@
         </div>
       </div>
     </div>
+    <!-- MODALE DE MODIFICATION -->
+    <div v-if="showEditSecretariat" class="modal-overlay" @click="closeEditModal">
+      <div class="modal-container add-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">Modifier le Secrétariat</h3>
+          <button class="modal-close" @click="closeEditModal">×</button>
+        </div>
+        <div class="modal-content">
+          <form class="add-form" @submit.prevent="updateSecretariat">
+            <div class="form-group">
+              <label>Nom du secrétariat</label>
+              <input type="text" v-model="editSecretariat.nom_secretariat" required>
+            </div>
+            <div class="form-group">
+              <label>Région</label>
+              <input type="text" v-model="editSecretariat.region_secretariat" required>
+            </div>
+            <div class="form-group">
+              <label>Secrétaire régional</label>
+              <input type="text" v-model="editSecretariat.sr" required>
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" v-model="editSecretariat.email" >
+            </div>
+            <div class="form-group">
+              <label>Contact</label>
+              <input type="text" v-model="editSecretariat.contact_sr" required>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="cancel-btn" @click="closeEditModal">
+                Annuler
+              </button>
+              <button type="submit" class="submit-btn">
+                Enregistrer les modifications
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <!-- MODALE DE SUPPRESSION -->
+    <div v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = false">
+      <div class="modal-container confirm-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">Confirmation de suppression</h3>
+          <button class="modal-close" @click="showDeleteConfirm = false">×</button>
+        </div>
+        <div class="modal-content">
+          <p>Voulez-vous vraiment supprimer le secrétariat <strong>{{ secretariatToDelete.nom_secretariat }}</strong> ?</p>
+          <div class="form-actions">
+            <button class="cancel-btn" @click="showDeleteConfirm = false">Annuler</button>
+            <button class="delete-btn" @click="confirmDelete">Supprimer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 
 // État réactif
+
+const API_BASE_URL = 'https://sogetrag.com/apistage/mes_secretariats_api.php'
+const ORGANES_API_URL = 'https://sogetrag.com/api/organes-api.php'
 const activeTab = ref('secretariats')
 const activeModalTab = ref('bureau')
+const secretariats = ref([])
 const showViewModal = ref(false)
+const isLoading = ref(false)
 const showAddSecretariat = ref(false)
 const showAddSousComite = ref(false)
 const showAddSection = ref(false)
@@ -496,6 +564,10 @@ const selectedMandat = ref('')
 const currentEntity = ref({})
 const selectedSecretariatForSections = ref('')
 const selectedSousComiteForSections = ref('')
+const showEditSecretariat = ref(false);
+const showDeleteConfirm = ref(false);
+const editSecretariat = ref({});
+const secretariatToDelete = ref(null);
 
 // Formulaires
 const newSecretariat = ref({
@@ -523,60 +595,6 @@ const newSection = ref({
 })
 
 // Données mockées
-const secretariats = ref([
-  {
-    id: 1,
-    nom: 'Secrétariat Nord',
-    region: 'Nord',
-    secretaire: 'Amadou Diallo',
-    email: 'amadou.diallo@aeemci.org',
-    contact: '+223 76 12 34 56',
-    sousComites: 5,
-    statut: 'Actif',
-    mandats: [
-      {
-        id: 1,
-        periode: '2023-2024',
-        duree: '1 an',
-        bureau: [
-          { id: 1, nom: 'Amadou Diallo', poste: 'Secrétaire Régional', email: 'amadou@aeemci.org' },
-          { id: 2, nom: 'Fatoumata Traoré', poste: 'Secrétaire Adjointe', email: 'fatoumata@aeemci.org' }
-        ]
-      }
-    ],
-    rapports: [
-      {
-        id: 1,
-        titre: 'Rapport annuel 2023',
-        date: '2023-12-31',
-        description: 'Bilan des activités de l\'année 2023'
-      }
-    ],
-    activites: [
-      {
-        id: 1,
-        titre: 'Formation leadership',
-        date: '2024-01-15',
-        description: 'Formation sur le leadership pour les membres',
-        participants: 45,
-        statut: 'Terminé'
-      }
-    ]
-  },
-  {
-    id: 2,
-    nom: 'Secrétariat Sud',
-    region: 'Sud',
-    secretaire: 'Mariam Koné',
-    email: 'mariam.kone@aeemci.org',
-    contact: '+223 65 78 90 12',
-    sousComites: 3,
-    statut: 'Actif',
-    mandats: [],
-    rapports: [],
-    activites: []
-  }
-])
 
 const sousComites = ref([
   {
@@ -639,6 +657,61 @@ const sections = ref([
     activites: []
   }
 ])
+
+
+const loadSecretariats = async () => {
+  console.log('test loadSecretariats function called');
+isLoading.value = true
+try {
+  console.log('🔍 Tentative de chargement des secrétariats...')
+
+  const url = `${API_BASE_URL}?action=list&t=${Date.now()}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json'
+    }
+  })
+
+  console.log('📊 Status de la réponse:', response.status)
+
+  if (!response.ok) {
+    throw new Error(`Erreur HTTP: ${response.status}`);
+
+  }
+  
+  const data = await response.json()
+  console.log('📦 Données brutes reçues:', data)
+
+  if (Array.isArray(data)) {
+    // Vider puis remplir
+    secretariats.value = data.map(sec => ({
+      id: sec.id,
+      nom_secretariat: sec.nom_secretariat,
+      sr: sec.sr || 'Non défini',
+      contact_sr: sec.contact_sr || 'Non défini',
+      region_secretariat: sec.region_secretariat || 'Non défini',
+      created_at: sec.created_at || new Date().toISOString()
+    }))
+
+    console.log('✅ Secrétariats chargésd:', secretariats.value)
+    secretariats.value.forEach((sec, index) => {
+    })
+
+    //addNotification(`${secretariats.value.length} secrétariat(s) chargé(s)`, 'success')
+  } else {
+    console.error('❌ Les données ne sont pas dans le format attendu:', data)
+    //addNotification('Erreur: Format de données invalide', 'error')
+  }
+} catch (error) {
+  console.error('❌ Erreur lors du chargement des secrétariats:', error)
+  //addNotification('Erreur lors du chargement des secrétariats', 'error')
+} finally {
+  isLoading.value = false
+  console.log('🏁 Chargement terminé, isLoading:', isLoading.value)
+}
+}
 
 // Computed
 const filteredSousComites = computed(() => {
@@ -740,6 +813,92 @@ const addSection = () => {
 const onSecretariatChange = () => {
   selectedSousComiteForSections.value = ''
 }
+
+// 👉 Quand on clique sur ✏️
+const editorg = (secretariat) => {
+  editSecretariat.value = { ...secretariat }; // Copie des données
+  showEditSecretariat.value = true;
+};
+
+// 👉 Quand on clique sur 🗑️
+const deleteorg = (secretariat) => {
+  secretariatToDelete.value = secretariat;
+  showDeleteConfirm.value = true;
+};
+
+// 👉 Fermer la modale d’édition
+const closeEditModal = () => {
+  showEditSecretariat.value = false;
+  editSecretariat.value = {};
+};
+
+// 👉 Confirmer la suppression
+const confirmDelete = async () => {
+  try {
+    const response = await fetch(`${ORGANES_API_URL}?=delete_secretariat&id=${secretariatToDelete.value.id_secretariat}`);
+    const data = await response.json();
+
+    if (data.success) {
+      secretariats.value = secretariats.value.filter(
+        s => s.id_secretariat !== secretariatToDelete.value.id_secretariat
+      );
+      alert("Secrétariat supprimé !");
+    } else {
+      alert("Erreur : " + data.error);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Erreur lors de la suppression.");
+  } finally {
+    showDeleteConfirm.value = false;
+  }
+};
+
+// 👉 Mettre à jour un secrétariat
+const updateSecretariat = async () => {
+  try {
+    
+    // CORRECT — action propre + param t séparé
+    const url = `${ORGANES_API_URL}?action=update_secretariat&t=${Date.now()}`;
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editSecretariat.value.id_secretariat,
+        nom_secretariat: editSecretariat.value.nom_secretariat,
+        region: editSecretariat.value.region,
+        sr: editSecretariat.value.responsable_nom,
+        email: editSecretariat.value.email,
+        contact: editSecretariat.value.responsable_contact
+      }),
+    });
+
+
+    const data = await response.json();
+
+    if (data.success) {
+      // Met à jour localement
+      const index = secretariats.value.findIndex(
+        s => s.id_secretariat === editSecretariat.value.id_secretariat
+      );
+      if (index !== -1) {
+        secretariats.value[index] = { ...editSecretariat.value };
+      }
+      alert("Mise à jour réussie !");
+      closeEditModal();
+    } else {
+      alert("Erreur : " + data.error);
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Erreur lors de la mise à jour.");
+  }
+};
+
+
+onMounted(async () => {
+await loadSecretariats()
+})
 </script>
 
 <style scoped>
@@ -950,8 +1109,8 @@ const onSecretariatChange = () => {
 }
 
 .entity-avatar {
-  width: 32px;
-  height: 32px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
   background: #16a34a;
   color: white;
