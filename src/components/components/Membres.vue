@@ -10,6 +10,12 @@
           <div class="stat-number">{{ pagination.total || 0 }}</div>
           <div class="stat-label">Membres</div>
         </div>
+        
+        <!-- Nouveau bloc : Comptes valides -->
+        <div class="stat-card">
+          <div class="stat-number">{{ stats.valid_accounts }}</div>
+          <div class="stat-label">Comptes valides</div>
+        </div>
         <div class="stat-card">
           <div class="stat-number">{{ membresActifs }}</div>
           <div class="stat-label">Actifs</div>
@@ -134,7 +140,37 @@
               <option value="Inactif">Inactif</option>
             </select>
           </div>
-          
+          <div class="filter-dropdown-container" @click="toggleDropdown">
+            <div :class="['filter-dropdown-trigger', { active: dropdownOpen }]">
+              <span class="selected-text">
+                {{ selectedOptionText || 'Tous les comptes' }}
+              </span>
+              <span class="dropdown-arrow">▾</span>
+            </div>
+
+            <div v-if="dropdownOpen" class="filter-dropdown-menu">
+              <div 
+                class="dropdown-option all-option" 
+                @click.stop="selectOption('')">
+                Tous les comptes
+              </div>
+              <div 
+                class="dropdown-option" 
+                :class="{ selected: accountStatusFilter === 'valid' }" 
+                @click.stop="selectOption('valid')">
+                Comptes valides
+              </div>
+              <div 
+                class="dropdown-option" 
+                :class="{ selected: accountStatusFilter === 'invalid' }" 
+                @click.stop="selectOption('invalid')">
+                Comptes invalides
+              </div>
+            </div>
+          </div>
+
+
+
           <button class="add-btn" @click="showAddMembre = true">
             <span class="add-icon">+</span>
             <span>Nouveau Membre</span>
@@ -210,6 +246,9 @@
                   </button>
                   <button class="action-btn delete" @click="deleteMembre(membre)" title="Supprimer">
                     🗑️
+                  </button>
+                  <button class="action-btn reset" @click="openResetPasswordModal(membre)" title="Réinitialiser le mot de passe">
+                    🔑
                   </button>
                 </div>
               </td>
@@ -518,10 +557,82 @@
       </div>
     </div>
 
+    
+    <!-- Modale de confirmation pour la réinitialisation du mot de passe -->
+    <div v-if="showResetPasswordModal" class="modal-overlay" @click="closeResetPasswordModal">
+      <div class="modal-container reset-password-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">
+            <i class="fas fa-key"></i>
+            Réinitialiser le mot de passe
+          </h3>
+          <button class="modal-close" @click="closeResetPasswordModal">×</button>
+        </div>
+        <div class="modal-content">
+          <div v-if="!passwordReset">
+            <p>Êtes-vous sûr de vouloir réinitialiser le mot de passe de :</p>
+            <div class="membre-info-confirm">
+              <strong>{{ selectedMembreForReset.nom }} {{ selectedMembreForReset.prenom }}</strong>
+              <span class="matricule-badge">{{ selectedMembreForReset.matricule }}</span>
+            </div>
+            <p class="warning-text">
+              <i class="fas fa-info-circle"></i>
+              Le mot de passe sera réinitialisé et le membre devra en créer un nouveau.
+            </p>
+          </div>
+
+          <div v-else>
+            <p>Veuillez saisir le nouveau mot de passe pour :</p>
+            <div class="membre-info-confirm">
+              <strong>{{ selectedMembreForReset.nom }} {{ selectedMembreForReset.prenom }}</strong>
+              <span class="matricule-badge">{{ selectedMembreForReset.matricule }}</span>
+            </div>
+            <div class="form-group">
+              <label>Nouveau mot de passe *</label>
+              <input type="password" v-model="newPassword" placeholder="Nouveau mot de passe" />
+            </div>
+            <div class="form-group">
+              <label>Confirmer le mot de passe *</label>
+              <input type="password" v-model="confirmPassword" placeholder="Confirmer le mot de passe" />
+            </div>
+            <p v-if="passwordError" class="error-text">{{ passwordError }}</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeResetPasswordModal">
+            Annuler
+          </button>
+          <button 
+            v-if="!passwordReset" 
+            class="confirm-btn danger" 
+            @click="initResetPassword"
+          >
+            <i class="fas fa-redo"></i>
+            Réinitialiser
+          </button>
+          <button 
+            v-else 
+            class="confirm-btn success" 
+            @click="submitNewPassword"
+          >
+            💾 Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+
     <div v-if="showPhotoModal" class="modal-overlay" @click="closePhotoModal">
       <div class="photo-modal" @click.stop>
         <div class="photo-modal-header">
-          <h3>{{ currentPhotoAlt }}</h3>
+          <!-- Bouton pour modifier la photo -->
+          <div class="photo-modal-actions">
+            <h3>{{ currentPhotoAlt }}</h3>
+            <button class="action-btn update-photo-btn" @click="openPhotoUpdateModal">
+              <i class="fas fa-camera"></i>
+              Modifier la photo
+            </button>
+          </div>
           <button class="modal-close" @click="closePhotoModal">×</button>
         </div>
         <div class="photo-modal-content">
@@ -603,7 +714,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted ,reactive} from 'vue'
 
 const API_BASE_URL = 'https://sogetrag.com/api/membres.php'
 
@@ -658,10 +769,55 @@ const newMembre = ref({
   type_membre: '',
   photo: null
 })
+const showResetPasswordModal = ref(false)
+const selectedMembreForReset = reactive({
+  id: null,
+  nom: '',
+  prenom: '',
+  matricule: ''
+})
 
 const showPhotoModal = ref(false)
 const currentPhoto = ref(null)
 const currentPhotoAlt = ref('')
+const accountStatusFilter = ref('') // '', 'valid', 'invalid'
+const dropdownOpen = ref(false)
+const selectOption = (option) => {
+  accountStatusFilter.value = option
+  dropdownOpen.value = false
+  loadMembres()
+}
+const selectedOptionText = computed(() => {
+  if (accountStatusFilter.value === 'valid') return 'Comptes valides'
+  if (accountStatusFilter.value === 'invalid') return 'Comptes invalides'
+  return ''
+})
+const toggleDropdown = () => {
+  dropdownOpen.value = !dropdownOpen.value
+}
+
+
+// Compte valide initialisé à 0
+const validAccounts = ref(0)
+
+const loadValidAccounts = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}?action=stats`)
+    const data = await res.json()
+    if (data.success && data.data?.valid_accounts !== undefined) {
+      validAccounts.value = data.data.valid_accounts
+      console.log('Comptes valides:', validAccounts.value)
+    } else {
+      console.warn('Propriété valid_accounts introuvable dans la réponse:', data)
+    }
+  } catch (err) {
+    console.error('Erreur fetch comptes valides:', err)
+  }
+}
+
+onMounted(() => {
+  loadValidAccounts()
+})
 
 const loadMembres = async () => {
   try {
@@ -682,6 +838,10 @@ const loadMembres = async () => {
     if (filters.value.card_status) {
       url += `&card_status=${encodeURIComponent(filters.value.card_status)}` 
     }
+    if (accountStatusFilter.value) {
+     url += `&account_status=${accountStatusFilter.value}` // 'valid' ou 'invalid'
+    }
+
     
     const response = await fetch(url)
     const data = await response.json()
@@ -737,6 +897,98 @@ const loadMembres = async () => {
   }
 }
 
+// Indique si le mot de passe a été réinitialisé
+const passwordReset = ref(false)
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordError = ref('')
+
+// Étape 1 : réinitialisation (backend met un mot de passe temporaire)
+const initResetPassword = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}?action=reset_password&id=${selectedMembreForReset.id}`,
+      { method: 'POST' }
+    )
+    const data = await response.json()
+    
+    if (data.success) {
+      alert('✅ Mot de passe réinitialisé. Veuillez saisir le nouveau mot de passe.')
+      passwordReset.value = true
+      newPassword.value = ''
+      confirmPassword.value = ''
+      passwordError.value = ''
+    } else {
+      alert(`❌ Erreur : ${data.message || data.error}`)
+    }
+  } catch (err) {
+    console.error(err)
+    alert('🚨 Erreur serveur lors de la réinitialisation.')
+  }
+}
+
+// Étape 2 : soumission du nouveau mot de passe
+const submitNewPassword = async () => {
+  if (!newPassword.value || !confirmPassword.value) {
+    passwordError.value = 'Veuillez remplir tous les champs.'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    passwordError.value = 'Les mots de passe ne correspondent pas.'
+    return
+  }
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}?action=set_new_password&id=${selectedMembreForReset.id}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword.value })
+      }
+    )
+    const data = await response.json()
+
+    if (data.success) {
+      alert('✅ Nouveau mot de passe enregistré avec succès !')
+      closeResetPasswordModal()
+    } else {
+      passwordError.value = data.message || 'Erreur lors de l’enregistrement du mot de passe.'
+    }
+  } catch (err) {
+    console.error(err)
+    passwordError.value = '🚨 Erreur serveur lors de l’enregistrement.'
+  }
+}
+
+// Adapter close modal
+const closeResetPasswordModal = () => {
+  showResetPasswordModal.value = false
+  selectedMembreForReset.id = null
+  selectedMembreForReset.nom = ''
+  selectedMembreForReset.prenom = ''
+  selectedMembreForReset.matricule = ''
+  passwordReset.value = false
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordError.value = ''
+}
+
+
+const openResetPasswordModal = (membre) => {
+  selectedMembreForReset.id = membre.id
+  selectedMembreForReset.nom = membre.nom
+  selectedMembreForReset.prenom = membre.prenom
+  selectedMembreForReset.matricule = membre.matricule
+  showResetPasswordModal.value = true
+}
+const openPhotoUpdateModal = (membreId) => {
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = 'image/*'
+  fileInput.addEventListener('change', (e) => handlePhotoUpload(e, membreId))
+  fileInput.click()
+}
 
 const debouncedSearch = () => {
   clearTimeout(searchTimeout.value)
@@ -804,15 +1056,37 @@ const getVisiblePages = () => {
   return pages
 }
 
-const handlePhotoUpload = (event) => {
+const handlePhotoUpload = (event,membreId) => {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      newMembre.value.photo = e.target.result
+  if (!file) return
+  editPhotoFile.value = file
+
+  const formData = new FormData()
+  formData.append('photo', file)
+
+  // Envoi direct au backend
+  fetch(`update_photo.php?id=${membreId}`, {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert('Photo mise à jour ✅')
+      // Met à jour la photo dans la liste des membres
+      const membreIndex = membres.value.findIndex(m => m.id === membreId)
+      if (membreIndex !== -1) {
+        membres.value[membreIndex].photo = data.new_photo_url || currentPhoto.value
+      }
+      closePhotoModal()
+    } else {
+      alert(`Erreur : ${data.message}`)
     }
-    reader.readAsDataURL(file)
-  }
+  })
+  .catch(err => {
+    console.error(err)
+    alert('Erreur serveur lors de la mise à jour de la photo ❌')
+  })
 }
 
 const addMembre = async () => {
@@ -987,6 +1261,24 @@ const formatDate = (dateString) => {
     day: 'numeric'
   })
 }
+const stats = ref({});
+
+const loadStats = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}?action=stats`);
+    const data = await res.json();
+    if (data.success) {
+      stats.value = data.data;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+onMounted(() => {
+  loadStats();
+});
+
 
 const formatDateTime = (dateString) => {
   if (!dateString) return 'Non renseigné'
@@ -1002,6 +1294,161 @@ const formatDateTime = (dateString) => {
 </script>
 
 <style scoped>
+
+/* ---------------------- MODAL RESET MOT DE PASSE ---------------------- */
+.reset-password-modal {
+  max-width: 400px;
+  width: 100%;
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.reset-password-modal .modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reset-password-modal .modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reset-password-modal .modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 20px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reset-password-modal .modal-close:hover {
+  background: #f3f4f6;
+}
+
+.reset-password-modal .modal-content {
+  padding: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #374151;
+}
+
+.reset-password-modal .membre-info-confirm {
+  margin: 12px 0;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.reset-password-modal .warning-text {
+  color: #dc2626;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.reset-password-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.reset-password-modal .cancel-btn {
+  padding: 8px 16px;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-password-modal .cancel-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.reset-password-modal .confirm-btn.danger {
+  padding: 8px 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.reset-password-modal .confirm-btn.danger:hover {
+  background: #b91c1c;
+}
+
+/* ---------------------- BOUTON RESET ---------------------- */
+.action-btn.reset {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.action-btn.reset:hover {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.photo-modal-actions {
+  display: flex;
+  flex-direction: column; /* empile le h3 et le bouton verticalement */
+  align-items: flex-start; /* aligne à gauche, tu peux changer en center si tu veux centrer */
+  gap: 8px; /* espace entre le h3 et le bouton */
+}
+
+.update-photo-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;           /* espace entre icône et texte */
+  background: #007BFF; 
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.update-photo-btn:hover {
+  background: #0056b3;
+}
+
+.update-photo-btn i {
+  font-size: 16px; /* taille de l'icône de la caméra */
+}
+
+
 .membres-page {
   background: #f9fafb;
   min-height: 100vh;
