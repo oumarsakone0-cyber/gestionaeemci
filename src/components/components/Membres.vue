@@ -10,6 +10,12 @@
           <div class="stat-number">{{ pagination.total || 0 }}</div>
           <div class="stat-label">Membres</div>
         </div>
+        
+        <!-- Nouveau bloc : Comptes valides -->
+        <div class="stat-card">
+          <div class="stat-number">{{ stats.valid_accounts }}</div>
+          <div class="stat-label">Comptes valides</div>
+        </div>
         <div class="stat-card">
           <div class="stat-number">{{ membresActifs }}</div>
           <div class="stat-label">Actifs</div>
@@ -134,7 +140,37 @@
               <option value="Inactif">Inactif</option>
             </select>
           </div>
-          
+          <div class="filter-dropdown-container" @click="toggleDropdown">
+            <div :class="['filter-dropdown-trigger', { active: dropdownOpen }]">
+              <span class="selected-text">
+                {{ selectedOptionText || 'Tous les comptes' }}
+              </span>
+              <span class="dropdown-arrow">▾</span>
+            </div>
+
+            <div v-if="dropdownOpen" class="filter-dropdown-menu">
+              <div 
+                class="dropdown-option all-option" 
+                @click.stop="selectOption('')">
+                Tous les comptes
+              </div>
+              <div 
+                class="dropdown-option" 
+                :class="{ selected: accountStatusFilter === 'valid' }" 
+                @click.stop="selectOption('valid')">
+                Comptes valides
+              </div>
+              <div 
+                class="dropdown-option" 
+                :class="{ selected: accountStatusFilter === 'invalid' }" 
+                @click.stop="selectOption('invalid')">
+                Comptes invalides
+              </div>
+            </div>
+          </div>
+
+
+
           <button class="add-btn" @click="showAddMembre = true">
             <span class="add-icon">+</span>
             <span>Nouveau Membre</span>
@@ -192,7 +228,7 @@
               <td>{{ membre.section || 'Non assignée' }}</td>
               <td class="contact-cell">
                 <div class="contact-info">
-                  <span class="contact-phone">📞 {{ membre.telephone }}</span>
+                  <span class="contact-phone">📞 {{ membre.contact }}</span>
                 </div>
               </td>
               <td>
@@ -210,6 +246,9 @@
                   </button>
                   <button class="action-btn delete" @click="deleteMembre(membre)" title="Supprimer">
                     🗑️
+                  </button>
+                  <button class="action-btn reset" @click="openResetPasswordModal(membre)" title="Réinitialiser le mot de passe">
+                    🔑
                   </button>
                 </div>
               </td>
@@ -314,7 +353,7 @@
           </div>
           <div class="form-group">
             <label>Téléphone *</label>
-            <input type="tel" v-model="newMembre.telephone" required placeholder="+223 XX XX XX XX" />
+            <input type="tel" v-model="newMembre.contact" required placeholder="+223 XX XX XX XX" />
           </div>
           <div class="form-group">
             <label>Secrétariat Régional *</label>
@@ -414,7 +453,7 @@
                   </div>
                   <div class="info-item-mini">
                     <i class="fas fa-phone"></i>
-                   Contact : <span>{{ currentMembre.telephone }}</span>
+                   Contact : <span>{{ currentMembre.contact }}</span>
                   </div>
                   <div class="info-item-mini" v-if="currentMembre.numero_wave">
                     <i class="fas fa-mobile-alt"></i>
@@ -518,10 +557,82 @@
       </div>
     </div>
 
+    
+    <!-- Modale de confirmation pour la réinitialisation du mot de passe -->
+    <div v-if="showResetPasswordModal" class="modal-overlay" @click="closeResetPasswordModal">
+      <div class="modal-container reset-password-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">
+            <i class="fas fa-key"></i>
+            Réinitialiser le mot de passe
+          </h3>
+          <button class="modal-close" @click="closeResetPasswordModal">×</button>
+        </div>
+        <div class="modal-content">
+          <div v-if="!passwordReset">
+            <p>Êtes-vous sûr de vouloir réinitialiser le mot de passe de :</p>
+            <div class="membre-info-confirm">
+              <strong>{{ selectedMembreForReset.nom }} {{ selectedMembreForReset.prenom }}</strong>
+              <span class="matricule-badge">{{ selectedMembreForReset.matricule }}</span>
+            </div>
+            <p class="warning-text">
+              <i class="fas fa-info-circle"></i>
+              Le mot de passe sera réinitialisé et le membre devra en créer un nouveau.
+            </p>
+          </div>
+
+          <div v-else>
+            <p>Veuillez saisir le nouveau mot de passe pour :</p>
+            <div class="membre-info-confirm">
+              <strong>{{ selectedMembreForReset.nom }} {{ selectedMembreForReset.prenom }}</strong>
+              <span class="matricule-badge">{{ selectedMembreForReset.matricule }}</span>
+            </div>
+            <div class="form-group">
+              <label>Nouveau mot de passe *</label>
+              <input type="password" v-model="newPassword" placeholder="Nouveau mot de passe" />
+            </div>
+            <div class="form-group">
+              <label>Confirmer le mot de passe *</label>
+              <input type="password" v-model="confirmPassword" placeholder="Confirmer le mot de passe" />
+            </div>
+            <p v-if="passwordError" class="error-text">{{ passwordError }}</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" @click="closeResetPasswordModal">
+            Annuler
+          </button>
+          <button 
+            v-if="!passwordReset" 
+            class="confirm-btn danger" 
+            @click="initResetPassword"
+          >
+            <i class="fas fa-redo"></i>
+            Réinitialiser
+          </button>
+          <button 
+            v-else 
+            class="confirm-btn success" 
+            @click="submitNewPassword"
+          >
+            💾 Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+
+
     <div v-if="showPhotoModal" class="modal-overlay" @click="closePhotoModal">
       <div class="photo-modal" @click.stop>
         <div class="photo-modal-header">
-          <h3>{{ currentPhotoAlt }}</h3>
+          <!-- Bouton pour modifier la photo -->
+          <div class="photo-modal-actions">
+            <h3>{{ currentPhotoAlt }}</h3>
+            <button class="action-btn update-photo-btn" @click="openPhotoUpdateModal">
+              <i class="fas fa-camera"></i>
+              Modifier la photo
+            </button>
+          </div>
           <button class="modal-close" @click="closePhotoModal">×</button>
         </div>
         <div class="photo-modal-content">
@@ -529,11 +640,81 @@
         </div>
       </div>
     </div>
+    
+    <!-- MODAL DE MODIFICATION DU MEMBRE -->
+    <div v-if="showEditModal" class="modal-overlay" @click="closeEditModal">
+      <div class="modal-container edit-modal" @click.stop>
+        <div class="modal-header">
+          <h3 class="modal-title">Modifier le Membre</h3>
+          <button class="modal-close" @click="closeEditModal">×</button>
+        </div>
+
+        <form class="edit-form" @submit.prevent="updateMembre">
+          <div class="form-group">
+            <label>Matricule</label>
+            <input type="text" v-model="editMembreData.matricule" readonly />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nom</label>
+              <input type="text" v-model="editMembreData.nom" required />
+            </div>
+            <div class="form-group">
+              <label>Prénom</label>
+              <input type="text" v-model="editMembreData.prenom" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Poste</label>
+            <input type="text" v-model="editMembreData.poste" required />
+          </div>
+          <div class="form-group">
+            <label>Photo</label>
+            <input type="file" accept="image/*" @change="handleEditPhotoUpload" />
+            <div v-if="editMembreData.photo" class="photo-preview">
+              <img :src="editMembreData.photo" alt="Photo du membre" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Secrétariat Régional</label>
+            <select v-model="editMembreData.secretariat_poste" required>
+              <option value="">-- Sélectionner --</option>
+              <option v-for="region in secretariats" :key="region" :value="region">
+                {{ region }}
+              </option>
+            </select>
+          </div>
+
+
+          <div class="form-group">
+            <label>Sous-comité</label>
+            <input type="text" v-model="editMembreData.sousComite"  required />
+          </div>
+
+          <div class="form-group">
+            <label>Section</label>
+            <input type="text" v-model="editMembreData.section" required/>
+          </div>
+
+          <div class="form-group">
+            <label>Contact</label>
+            <input type="text" v-model="editMembreData.contact"  required/>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="cancel-btn" @click="closeEditModal">Annuler</button>
+            <button type="submit" class="submit-btn" @click="updateMembre">💾 Enregistrer</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, onUnmounted } from 'vue'
+import { ref, computed, onMounted, nextTick, onUnmounted ,reactive} from 'vue'
 
 const API_BASE_URL = 'https://sogetrag.com/api/membres.php'
 
@@ -571,13 +752,16 @@ const pagination = ref({
 const showAddMembre = ref(false)
 const showViewModal = ref(false)
 const currentMembre = ref(null)
+const showEditModal = ref(false)
+const editMembreData = ref({})
+
 
 const newMembre = ref({
   matricule: '',
   nom: '',
   prenom: '',
   email: '',
-  telephone: '',
+  contact: '',
   secretariatRegional: '',
   sousComite: '',
   section: '',
@@ -585,10 +769,55 @@ const newMembre = ref({
   type_membre: '',
   photo: null
 })
+const showResetPasswordModal = ref(false)
+const selectedMembreForReset = reactive({
+  id: null,
+  nom: '',
+  prenom: '',
+  matricule: ''
+})
 
 const showPhotoModal = ref(false)
 const currentPhoto = ref(null)
 const currentPhotoAlt = ref('')
+const accountStatusFilter = ref('') // '', 'valid', 'invalid'
+const dropdownOpen = ref(false)
+const selectOption = (option) => {
+  accountStatusFilter.value = option
+  dropdownOpen.value = false
+  loadMembres()
+}
+const selectedOptionText = computed(() => {
+  if (accountStatusFilter.value === 'valid') return 'Comptes valides'
+  if (accountStatusFilter.value === 'invalid') return 'Comptes invalides'
+  return ''
+})
+const toggleDropdown = () => {
+  dropdownOpen.value = !dropdownOpen.value
+}
+
+
+// Compte valide initialisé à 0
+const validAccounts = ref(0)
+
+const loadValidAccounts = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}?action=stats`)
+    const data = await res.json()
+    if (data.success && data.data?.valid_accounts !== undefined) {
+      validAccounts.value = data.data.valid_accounts
+      console.log('Comptes valides:', validAccounts.value)
+    } else {
+      console.warn('Propriété valid_accounts introuvable dans la réponse:', data)
+    }
+  } catch (err) {
+    console.error('Erreur fetch comptes valides:', err)
+  }
+}
+
+onMounted(() => {
+  loadValidAccounts()
+})
 
 const loadMembres = async () => {
   try {
@@ -609,6 +838,10 @@ const loadMembres = async () => {
     if (filters.value.card_status) {
       url += `&card_status=${encodeURIComponent(filters.value.card_status)}` 
     }
+    if (accountStatusFilter.value) {
+     url += `&account_status=${accountStatusFilter.value}` // 'valid' ou 'invalid'
+    }
+
     
     const response = await fetch(url)
     const data = await response.json()
@@ -620,7 +853,7 @@ const loadMembres = async () => {
         nom: membre.nom,
         prenom: membre.prenom,
         email: membre.email,
-        telephone: membre.telephone || membre.contact,
+        contact: membre.contact || membre.contact,
         secretariatRegional: membre.region || membre.secretariat,
         sousComite: membre.sous_comite,
         section: membre.section,
@@ -662,6 +895,99 @@ const loadMembres = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Indique si le mot de passe a été réinitialisé
+const passwordReset = ref(false)
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordError = ref('')
+
+// Étape 1 : réinitialisation (backend met un mot de passe temporaire)
+const initResetPassword = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}?action=reset_password&id=${selectedMembreForReset.id}`,
+      { method: 'POST' }
+    )
+    const data = await response.json()
+    
+    if (data.success) {
+      alert('✅ Mot de passe réinitialisé. Veuillez saisir le nouveau mot de passe.')
+      passwordReset.value = true
+      newPassword.value = ''
+      confirmPassword.value = ''
+      passwordError.value = ''
+    } else {
+      alert(`❌ Erreur : ${data.message || data.error}`)
+    }
+  } catch (err) {
+    console.error(err)
+    alert('🚨 Erreur serveur lors de la réinitialisation.')
+  }
+}
+
+// Étape 2 : soumission du nouveau mot de passe
+const submitNewPassword = async () => {
+  if (!newPassword.value || !confirmPassword.value) {
+    passwordError.value = 'Veuillez remplir tous les champs.'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    passwordError.value = 'Les mots de passe ne correspondent pas.'
+    return
+  }
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}?action=set_new_password&id=${selectedMembreForReset.id}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword.value })
+      }
+    )
+    const data = await response.json()
+
+    if (data.success) {
+      alert('✅ Nouveau mot de passe enregistré avec succès !')
+      closeResetPasswordModal()
+    } else {
+      passwordError.value = data.message || 'Erreur lors de l’enregistrement du mot de passe.'
+    }
+  } catch (err) {
+    console.error(err)
+    passwordError.value = '🚨 Erreur serveur lors de l’enregistrement.'
+  }
+}
+
+// Adapter close modal
+const closeResetPasswordModal = () => {
+  showResetPasswordModal.value = false
+  selectedMembreForReset.id = null
+  selectedMembreForReset.nom = ''
+  selectedMembreForReset.prenom = ''
+  selectedMembreForReset.matricule = ''
+  passwordReset.value = false
+  newPassword.value = ''
+  confirmPassword.value = ''
+  passwordError.value = ''
+}
+
+
+const openResetPasswordModal = (membre) => {
+  selectedMembreForReset.id = membre.id
+  selectedMembreForReset.nom = membre.nom
+  selectedMembreForReset.prenom = membre.prenom
+  selectedMembreForReset.matricule = membre.matricule
+  showResetPasswordModal.value = true
+}
+const openPhotoUpdateModal = (membreId) => {
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = 'image/*'
+  fileInput.addEventListener('change', (e) => handlePhotoUpload(e, membreId))
+  fileInput.click()
 }
 
 const debouncedSearch = () => {
@@ -730,15 +1056,37 @@ const getVisiblePages = () => {
   return pages
 }
 
-const handlePhotoUpload = (event) => {
+const handlePhotoUpload = (event,membreId) => {
   const file = event.target.files[0]
-  if (file) {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      newMembre.value.photo = e.target.result
+  if (!file) return
+  editPhotoFile.value = file
+
+  const formData = new FormData()
+  formData.append('photo', file)
+
+  // Envoi direct au backend
+  fetch(`update_photo.php?id=${membreId}`, {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert('Photo mise à jour ✅')
+      // Met à jour la photo dans la liste des membres
+      const membreIndex = membres.value.findIndex(m => m.id === membreId)
+      if (membreIndex !== -1) {
+        membres.value[membreIndex].photo = data.new_photo_url || currentPhoto.value
+      }
+      closePhotoModal()
+    } else {
+      alert(`Erreur : ${data.message}`)
     }
-    reader.readAsDataURL(file)
-  }
+  })
+  .catch(err => {
+    console.error(err)
+    alert('Erreur serveur lors de la mise à jour de la photo ❌')
+  })
 }
 
 const addMembre = async () => {
@@ -756,7 +1104,7 @@ const addMembre = async () => {
       nom: '',
       prenom: '',
       email: '',
-      telephone: '',
+      contact: '',
       secretariatRegional: '',
       sousComite: '',
       section: '',
@@ -775,8 +1123,50 @@ const viewMembre = (membre) => {
 }
 
 const editMembre = (membre) => {
-  console.log('Éditer membre:', membre)
+  editMembreData.value = { ...membre }
+  showEditModal.value = true
 }
+const closeEditModal = () => {
+  showEditModal.value = false
+  editMembreData.value = {}
+}
+
+const handleEditPhotoUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      editMembreData.value.photo = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+const updateMembre = async () => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}?action=update_membre&id=${editMembreData.value.id}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editMembreData.value),
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.success) {
+      alert('✅ Modifications enregistrées avec succès !');
+      await loadMembres();
+      closeEditModal();
+    } else {
+      alert('❌ Erreur lors de la mise à jour : ' + (data.message || data.error));
+    }
+  } catch (err) {
+    console.error('Erreur updateMembre:', err);
+    alert('🚨 Une erreur est survenue lors de l’enregistrement.');
+  }
+};
+
 
 const deleteMembre = async (membre) => {
   if (confirm(`Êtes-vous sûr de vouloir supprimer ${membre.nom} ${membre.prenom} ?`)) {
@@ -871,6 +1261,24 @@ const formatDate = (dateString) => {
     day: 'numeric'
   })
 }
+const stats = ref({});
+
+const loadStats = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}?action=stats`);
+    const data = await res.json();
+    if (data.success) {
+      stats.value = data.data;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+onMounted(() => {
+  loadStats();
+});
+
 
 const formatDateTime = (dateString) => {
   if (!dateString) return 'Non renseigné'
@@ -886,6 +1294,161 @@ const formatDateTime = (dateString) => {
 </script>
 
 <style scoped>
+
+/* ---------------------- MODAL RESET MOT DE PASSE ---------------------- */
+.reset-password-modal {
+  max-width: 400px;
+  width: 100%;
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+}
+
+.reset-password-modal .modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reset-password-modal .modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reset-password-modal .modal-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 20px;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reset-password-modal .modal-close:hover {
+  background: #f3f4f6;
+}
+
+.reset-password-modal .modal-content {
+  padding: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: #374151;
+}
+
+.reset-password-modal .membre-info-confirm {
+  margin: 12px 0;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.reset-password-modal .warning-text {
+  color: #dc2626;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.reset-password-modal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.reset-password-modal .cancel-btn {
+  padding: 8px 16px;
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-password-modal .cancel-btn:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.reset-password-modal .confirm-btn.danger {
+  padding: 8px 16px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.reset-password-modal .confirm-btn.danger:hover {
+  background: #b91c1c;
+}
+
+/* ---------------------- BOUTON RESET ---------------------- */
+.action-btn.reset {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.action-btn.reset:hover {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.photo-modal-actions {
+  display: flex;
+  flex-direction: column; /* empile le h3 et le bouton verticalement */
+  align-items: flex-start; /* aligne à gauche, tu peux changer en center si tu veux centrer */
+  gap: 8px; /* espace entre le h3 et le bouton */
+}
+
+.update-photo-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;           /* espace entre icône et texte */
+  background: #007BFF; 
+  border: none;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.update-photo-btn:hover {
+  background: #0056b3;
+}
+
+.update-photo-btn i {
+  font-size: 16px; /* taille de l'icône de la caméra */
+}
+
+
 .membres-page {
   background: #f9fafb;
   min-height: 100vh;
@@ -1481,6 +2044,109 @@ const formatDateTime = (dateString) => {
   overflow-y: auto;
   width: 100%;
     max-width: 100%;
+}
+/* Modal globale pour édition */
+.edit-modal {
+  max-width: 600px; /* largeur */
+  width: 100%;
+  max-height: 80vh; /* hauteur maximale pour éviter de dépasser l'écran */
+  overflow-y: auto; /* scroll vertical si contenu trop grand */
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  padding: 10px;
+}
+
+/* Contenu interne de la modal */
+.edit-modal .modal-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Champ photo avec preview */
+.edit-modal .photo-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+/* Input et select */
+.edit-modal input,
+.edit-modal select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.edit-modal input:focus,
+.edit-modal select:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+/* Boutons */
+.edit-modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.edit-modal .submit-btn {
+  background: #16a34a;
+  color: white;
+}
+
+.edit-modal .submit-btn:hover {
+  background: #15803d;
+}
+
+.edit-modal .cancel-btn {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+}
+
+.edit-modal .cancel-btn:hover {
+  background: #f3f4f6;
+}
+
+/* Photo et champs alignés proprement */
+.edit-modal .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Responsive : champs sur une seule colonne sur petits écrans */
+@media (max-width: 500px) {
+  .edit-modal .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Photo Upload Preview */
+.edit-modal .photo-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.edit-modal .photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .add-form {
