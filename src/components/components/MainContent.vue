@@ -1,429 +1,506 @@
 <template>
-  <main class="main-content">
-    <!-- Section In Progress -->
-    <div class="task-section">
-      <div class="section-header">
-        <div class="section-title">
-          <span class="status-indicator in-progress"></span>
-          <span class="title-text">In Progress</span>
-          <span class="task-count">2</span>
+  <div class="min-h-screen bg-gray-50" style="width: 100%;">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+      <div class="max-w-full mx-auto px-8 py-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-3xl font-bold text-gray-900">Questionnaire AEEMCI</h1>
+            <p style="padding: 10px;" class="text-gray-600 mt-1">Gestion des questions et réponses</p>
+          </div>
+          <button
+            @click="openModal()"
+            class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm"
+          >
+            + Ajouter une question
+          </button>
         </div>
       </div>
+    </header>
 
-      <div class="task-table">
-        <div class="table-header">
-          <div class="col-task">Task</div>
-          <div class="col-description">Description</div>
-          <div class="col-assignee">Assignee</div>
-          <div class="col-date">Due Date</div>
-          <div class="col-priority">Priority</div>
-          <div class="col-progress">Progress</div>
-          <div class="col-created">Created</div>
-          <div class="col-actions"></div>
+    <!-- Main Content -->
+    <main class="max-w-full mx-auto px-8 py-8">
+      <!-- Loading State -->
+      <div v-if="loading" class="flex justify-center items-center py-20">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+        <p class="text-red-800">{{ error }}</p>
+      </div>
+
+      <!-- Table -->
+      <div v-else class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-gray-50 border-b border-gray-200">
+              <tr >
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider" style="padding: 10px;">Question</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Réponse</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Gain</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Contact</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date Début</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Date Fin</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">État</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Progression</th>
+                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr v-for="item in questionnaires" :key="item.id" class="hover:bg-gray-50 transition-colors">
+                <td class="px-6 py-4" style="padding: 10px;">
+                  <div class="text-sm font-medium text-gray-900">{{ item.question }}</div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="text-sm text-gray-700">{{ item.reponse }}</div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="text-sm font-semibold text-green-600">{{ item.gain }}</div>
+                </td>
+                <td class="px-6 py-4">
+                  <a :href="`tel:${item.contact}`" class="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+                    {{ item.contact }}
+                  </a>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="text-sm text-gray-700">
+                    {{ item.debut ? formatDate(item.debut) : '-' }}
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="text-sm text-gray-700">{{ formatDate(item.date) }}</div>
+                </td>
+                <td class="px-6 py-4">
+                  <span :class="getStatusClass(item.etat)" class="px-3 py-1 rounded-full text-xs font-medium">
+                    {{ item.etat }}
+                  </span>
+                </td>
+                <td class="px-6 py-4">
+                  <div v-if="item.etat === 'En cours' && item.debut" class="space-y-2">
+                    <div class="flex items-center gap-3">
+                      <div class="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div 
+                          :class="getProgressColor(calculateProgress(item.debut))"
+                          class="h-full transition-all duration-1000 ease-linear"
+                          :style="{ width: `${calculateProgress(item.debut)}%` }"
+                        ></div>
+                      </div>
+                      <span class="text-xs font-medium text-gray-700 min-w-[45px]">
+                        {{ calculateProgress(item.debut) }}%
+                      </span>
+                    </div>
+                    <div class="text-xs text-gray-600 font-mono">
+                      ⏱️ {{ formatTimeRemaining(item.debut) }}
+                    </div>
+                  </div>
+                  <div v-else class="text-sm text-gray-400">-</div>
+                </td>
+                <td class="px-6 py-4" style="padding: 10px;">
+                  <div class="flex items-center gap-2">
+                    <button
+                      v-if="item.etat !== 'En cours'"
+                      @click="startTimer(item.id)"
+                      class="px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
+                      title="Démarrer le compte à rebours"
+                    >
+                      ▶️ Démarrer
+                    </button>
+                    <button
+                      @click="openModal(item)"
+                      class="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      @click="deleteQuestionnaire(item.id)"
+                      class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal -->
+    <div v-if="showModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" style="padding: 15px;">
+        <div class="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-gray-900">
+            {{ editingItem ? 'Modifier la question' : 'Ajouter une question' }}
+          </h2>
+          <button @click="closeModal" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
         </div>
 
-        <div class="task-row">
-          <div class="col-task">
-            <div class="task-info">
-              <span class="task-icon">🔲</span>
-              <span class="task-name">Wireframing</span>
-              <span class="task-number">3</span>
-            </div>
+        <form @submit.prevent="saveQuestionnaire" class="p-6 space-y-5">
+          <div>
+            <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">Question *</label>
+            <textarea
+            style="padding: 5px; margin: 10px;"
+              v-model="formData.question"
+              required
+              rows="3"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Entrez la question..."
+            ></textarea>
           </div>
-          <div class="col-description">-</div>
-          <div class="col-assignee">
-            <div class="assignee-avatars">
-              <div class="avatar avatar-1"></div>
-              <div class="avatar avatar-2"></div>
-            </div>
-          </div>
-          <div class="col-date">February 12, 2024</div>
-          <div class="col-priority">
-            <span class="priority urgent">🔴 Urgent</span>
-          </div>
-          <div class="col-progress">
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: 85%"></div>
-            </div>
-            <span class="progress-text">85%</span>
-          </div>
-          <div class="col-created">
-            <span class="created-icon">👤</span>
-          </div>
-          <div class="col-actions">
-            <button class="action-btn">⋯</button>
-          </div>
-        </div>
 
-        <div class="task-row">
-          <div class="col-task">
-            <div class="task-info">
-              <span class="task-icon">📊</span>
-              <span class="task-name">Dashboard</span>
-            </div>
+          <div>
+            <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">Réponse *</label>
+            <textarea
+            style="padding: 5px; margin: 10px;"
+              v-model="formData.reponse"
+              required
+              rows="3"
+              class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Entrez la réponse..."
+            ></textarea>
           </div>
-          <div class="col-description">Create wireframe for Dashboard page</div>
-          <div class="col-assignee">
-            <div class="assignee-avatars">
-              <div class="avatar avatar-3"></div>
-              <div class="avatar avatar-4"></div>
-            </div>
-          </div>
-          <div class="col-date">February 12, 2024</div>
-          <div class="col-priority">
-            <span class="priority urgent">🔴 Urgent</span>
-          </div>
-          <div class="col-progress">
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: 95%"></div>
-            </div>
-            <span class="progress-text">95%</span>
-          </div>
-          <div class="col-created">
-            <span class="created-icon">👤</span>
-          </div>
-          <div class="col-actions">
-            <button class="action-btn">⋯</button>
-          </div>
-        </div>
 
-        <!-- Plus de tâches... -->
-        <div class="task-row">
-          <div class="col-task">
-            <div class="task-info">
-              <span class="task-icon">📈</span>
-              <span class="task-name">Analytics</span>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">Gain *</label>
+              <input
+              style="padding: 5px; margin: 10px;"
+                v-model="formData.gain"
+                type="text"
+                required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: 1000 FCFA"
+              />
             </div>
-          </div>
-          <div class="col-description">Create wireframe for analytics page</div>
-          <div class="col-assignee">
-            <div class="assignee-avatars">
-              <div class="avatar avatar-1"></div>
-              <div class="avatar avatar-2"></div>
-              <div class="avatar avatar-5"></div>
-            </div>
-          </div>
-          <div class="col-date">February 12, 2024</div>
-          <div class="col-priority">
-            <span class="priority urgent">🔴 Urgent</span>
-          </div>
-          <div class="col-progress">
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: 100%"></div>
-            </div>
-            <span class="progress-text">100%</span>
-          </div>
-          <div class="col-created">
-            <span class="created-icon">👤</span>
-          </div>
-          <div class="col-actions">
-            <button class="action-btn">⋯</button>
-          </div>
-        </div>
 
-        <button class="add-task-btn">+ Add task</button>
+            <div>
+              <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">Contact *</label>
+              <input
+              style="padding: 5px; margin: 10px;"
+                v-model="formData.contact"
+                type="tel"
+                required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Ex: +225 07 XX XX XX XX"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">Date de fin *</label>
+              <input
+              style="padding: 5px; margin: 10px;"
+                v-model="formData.date"
+                type="datetime-local"
+                required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">État *</label>
+              <select
+              style="padding: 5px; margin: 10px;"
+                v-model="formData.etat"
+                required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="En attente">En attente</option>
+                <option value="En cours">En cours</option>
+                <option value="Terminé">Terminé</option>
+                <option value="Annulé">Annulé</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4" v-if="editingItem">
+            <div>
+              <label style="padding: 10px;" class="block text-sm font-semibold text-gray-700 mb-2">Matricule Gagnant *</label>
+              <input
+              style="padding: 5px; margin: 10px;"
+                v-model="formData.repondu"
+                type="text"
+                required
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="SAK-ONE-01-001"
+              />
+            </div>
+          </div>
+
+          <div class="flex gap-3 pt-4">
+            <button
+              type="submit"
+              :disabled="saving"
+              class="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {{ saving ? 'Enregistrement...' : (editingItem ? 'Mettre à jour' : 'Ajouter') }}
+            </button>
+            <button
+              type="button"
+              @click="closeModal"
+              class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+            >
+              Annuler
+            </button>
+          </div>
+        </form>
       </div>
     </div>
-
-    <!-- Section Ready to check by PM -->
-    <div class="task-section">
-      <div class="section-header">
-        <div class="section-title">
-          <span class="status-indicator ready"></span>
-          <span class="title-text">Ready to check by PM</span>
-          <span class="task-count">2</span>
-        </div>
-      </div>
-
-      <div class="task-table">
-        <div class="table-header">
-          <div class="col-task">Task</div>
-          <div class="col-description">Description</div>
-          <div class="col-assignee">Assignee</div>
-          <div class="col-date">Due Date</div>
-          <div class="col-priority">Priority</div>
-          <div class="col-progress">Progress</div>
-          <div class="col-created">Created</div>
-          <div class="col-actions"></div>
-        </div>
-
-        <div class="task-row">
-          <div class="col-task">
-            <div class="task-info">
-              <span class="task-icon">🔲</span>
-              <span class="task-name">Wireframing</span>
-              <span class="task-number">3</span>
-            </div>
-          </div>
-          <div class="col-description">-</div>
-          <div class="col-assignee">
-            <div class="assignee-avatars">
-              <div class="avatar avatar-1"></div>
-              <div class="avatar avatar-2"></div>
-            </div>
-          </div>
-          <div class="col-date">February 9, 2024</div>
-          <div class="col-priority">
-            <span class="priority urgent">🔴 Urgent</span>
-          </div>
-          <div class="col-progress">
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: 100%"></div>
-            </div>
-            <span class="progress-text">100%</span>
-          </div>
-          <div class="col-created">
-            <span class="created-icon">👤</span>
-          </div>
-          <div class="col-actions">
-            <button class="action-btn">⋯</button>
-          </div>
-        </div>
-
-        <button class="add-task-btn">+ Add task</button>
-      </div>
-    </div>
-  </main>
+  </div>
 </template>
 
 <script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+
+const API_URL = 'https://www.sogetrag.com/api/questionnaire.php'
+
+const questionnaires = ref([])
+const showModal = ref(false)
+const editingItem = ref(null)
+const loading = ref(false)
+const saving = ref(false)
+const error = ref(null)
+
+const formData = ref({
+  question: '',
+  reponse: '',
+  gain: '',
+  date: '',
+  etat: 'En attente',
+  contact: '',
+  repondu: ''
+})
+
+let progressInterval = null
+
+// Fetch questionnaires from API
+const fetchQuestionnaires = async () => {
+  loading.value = true
+  error.value = null
+
+  try {
+    const cacheBuster = Math.random().toString(36).substring(2) // ou Date.now()
+    const response = await fetch(`${API_URL}?action=questionnaires&cb=${cacheBuster}`)
+    
+    const data = await response.json()
+
+    if (data.success) {
+      questionnaires.value = data.data
+    } else {
+      error.value = data.message || 'Erreur lors du chargement des questionnaires'
+    }
+  } catch (err) {
+    console.error('[v0] Error fetching questionnaires:', err)
+    error.value = 'Erreur de connexion à l\'API'
+  } finally {
+    loading.value = false
+  }
+}
+
+
+// Create or update questionnaire
+const saveQuestionnaire = async () => {
+  saving.value = true
+  error.value = null
+
+  try {
+    const isUpdate = !!editingItem.value
+    const action = isUpdate ? 'update' : 'create'
+
+    // Construire l'URL avec l'action, et l'id uniquement si c'est une mise à jour
+    let url = `${API_URL}?action=${action}`
+    if (isUpdate) {
+      url += `&id=${editingItem.value.id}`
+    }
+
+    // Préparer les données sans inclure l'id (puisqu'il est dans l'URL pour update)
+    const payload = {
+      ...formData.value
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      await fetchQuestionnaires()
+      closeModal()
+    } else {
+      error.value = data.message || 'Erreur lors de l\'enregistrement'
+    }
+  } catch (err) {
+    console.error('[v0] Error saving questionnaire:', err)
+    error.value = 'Erreur de connexion à l\'API'
+  } finally {
+    saving.value = false
+  }
+}
+
+// Delete questionnaire
+const deleteQuestionnaire = async (id) => {
+  if (!confirm('Êtes-vous sûr de vouloir supprimer cette question ?')) {
+    return
+  }
+
+  try {
+    const cacheBuster = Math.random().toString(36).substring(2) // pour éviter le cache
+    const url = `${API_URL}?action=delete&id=${id}&cb=${cacheBuster}`
+
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: null // plus besoin d’envoyer de données dans le corps
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      await fetchQuestionnaires()
+    } else {
+      error.value = data.message || 'Erreur lors de la suppression'
+    }
+  } catch (err) {
+    console.error('[v0] Error deleting questionnaire:', err)
+    error.value = 'Erreur de connexion à l\'API'
+  }
+}
+
+// Start timer
+const startTimer = async (id) => {
+  try {
+    const cacheBuster = Math.random().toString(36).substring(2)
+    const url = `${API_URL}?action=start_timer&id=${id}&cb=${cacheBuster}`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: null // 👈 aucun body n’est nécessaire dans ce cas
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      await fetchQuestionnaires()
+    } else {
+      error.value = data.message || 'Erreur lors du démarrage du timer'
+    }
+  } catch (err) {
+    console.error('[v0] Error starting timer:', err)
+    error.value = 'Erreur de connexion à l\'API'
+  }
+}
+
+
+const openModal = (item = null) => {
+  editingItem.value = item
+  if (item) {
+    formData.value = {
+      question: item.question,
+      reponse: item.reponse,
+      gain: item.gain,
+      date: item.date ? item.date.replace(' ', 'T').substring(0, 16) : '',
+      etat: item.etat,
+      contact: item.contact
+    }
+  } else {
+    formData.value = {
+      question: '',
+      reponse: '',
+      gain: '',
+      date: '',
+      etat: 'En attente',
+      contact: ''
+    }
+  }
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  editingItem.value = null
+}
+
+const calculateProgress = (debutDate) => {
+  if (!debutDate) return 0
+  
+  const debut = new Date(debutDate)
+  const now = new Date()
+  const elapsed = (now - debut) / 1000 // seconds
+  const total = 15 * 60 // 15 minutes in seconds
+  
+  const progress = Math.min(Math.round((elapsed / total) * 100), 100)
+  return progress
+}
+
+const formatTimeRemaining = (debutDate) => {
+  if (!debutDate) return '15:00'
+  
+  const debut = new Date(debutDate)
+  const now = new Date()
+  const elapsed = (now - debut) / 1000 // seconds
+  const total = 15 * 60 // 15 minutes in seconds
+  const remaining = Math.max(total - elapsed, 0)
+  
+  const minutes = Math.floor(remaining / 60)
+  const seconds = Math.floor(remaining % 60)
+  
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+}
+
+const getProgressColor = (progress) => {
+  if (progress < 50) return 'bg-blue-500'
+  if (progress < 80) return 'bg-yellow-500'
+  return 'bg-red-500'
+}
+
+const getStatusClass = (status) => {
+  const classes = {
+    'En cours': 'bg-blue-100 text-blue-800',
+    'Terminé': 'bg-green-100 text-green-800',
+    'En attente': 'bg-yellow-100 text-yellow-800',
+    'Annulé': 'bg-red-100 text-red-800'
+  }
+  return classes[status] || 'bg-gray-100 text-gray-800'
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return '-'
+  const date = new Date(dateString)
+  return date.toLocaleString('fr-FR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+onMounted(() => {
+  fetchQuestionnaires()
+  
+  // Update progress every second
+  progressInterval = setInterval(() => {
+    // Force reactivity update for progress bars
+    questionnaires.value = [...questionnaires.value]
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (progressInterval) {
+    clearInterval(progressInterval)
+  }
+})
 </script>
-
-<style scoped>
-.main-content {
-  flex: 1;
-  padding: 24px;
-  overflow-y: auto;
-  background: #f8f9fa;
-}
-
-.task-section {
-  background: white;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.section-header {
-  padding: 16px 24px;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.status-indicator.in-progress {
-  background: #f59e0b;
-}
-
-.status-indicator.ready {
-  background: #8b5cf6;
-}
-
-.title-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.task-count {
-  background: #f3f4f6;
-  color: #6b7280;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.task-table {
-  padding: 0 24px 24px;
-}
-
-.table-header {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr 80px 40px;
-  gap: 16px;
-  padding: 12px 0;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.task-row {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1fr 1fr 1fr 1fr 80px 40px;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid #f3f4f6;
-  align-items: center;
-}
-
-.task-row:hover {
-  background: #f9fafb;
-}
-
-.task-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.task-icon {
-  font-size: 16px;
-}
-
-.task-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1f2937;
-}
-
-.task-number {
-  background: #f3f4f6;
-  color: #6b7280;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.col-description {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.assignee-avatars {
-  display: flex;
-  gap: -4px;
-}
-
-.avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid white;
-  margin-left: -4px;
-}
-
-.avatar:first-child {
-  margin-left: 0;
-}
-
-.avatar-1 { background: #ef4444; }
-.avatar-2 { background: #3b82f6; }
-.avatar-3 { background: #10b981; }
-.avatar-4 { background: #f59e0b; }
-.avatar-5 { background: #8b5cf6; }
-
-.col-date {
-  font-size: 13px;
-  color: #6b7280;
-}
-
-.priority {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.priority.urgent {
-  color: #dc2626;
-}
-
-.priority.normal {
-  color: #059669;
-}
-
-.priority.low {
-  color: #6b7280;
-}
-
-.col-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.progress-bar {
-  flex: 1;
-  height: 6px;
-  background: #e5e7eb;
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #6366f1;
-  border-radius: 3px;
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  font-size: 12px;
-  color: #6b7280;
-  font-weight: 500;
-  min-width: 32px;
-}
-
-.created-icon {
-  font-size: 16px;
-}
-
-.action-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
-  border-radius: 4px;
-  color: #9ca3af;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.action-btn:hover {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.add-task-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border: 1px dashed #d1d5db;
-  background: transparent;
-  border-radius: 6px;
-  color: #6b7280;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 14px;
-  margin-top: 16px;
-  width: 100%;
-  justify-content: center;
-}
-
-.add-task-btn:hover {
-  border-color: #6366f1;
-  color: #6366f1;
-  background: #f8faff;
-}
-</style>
