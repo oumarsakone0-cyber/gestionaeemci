@@ -857,22 +857,21 @@ const confirmDelete = async () => {
 // 👉 Mettre à jour un secrétariat
 const updateSecretariat = async () => {
   try {
+    const formData = new FormData();
     
+    formData.append("id", editSecretariat.value.id_secretariat);
+    formData.append("nom_secretariat", editSecretariat.value.nom_secretariat);
+    formData.append("region", editSecretariat.value.region);
+    formData.append("sr", editSecretariat.value.responsable_nom);
+    formData.append("email", editSecretariat.value.email);
+    formData.append("contact", editSecretariat.value.responsable_contact);
     // CORRECT — action propre + param t séparé
     const url = `${ORGANES_API_URL}?action=update_secretariat&t=${Date.now()}`;
+
     const response = await fetch(url, {
       method: "PUT",
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: editSecretariat.value.id_secretariat,
-        nom_secretariat: editSecretariat.value.nom_secretariat,
-        region: editSecretariat.value.region,
-        sr: editSecretariat.value.responsable_nom,
-        email: editSecretariat.value.email,
-        contact: editSecretariat.value.responsable_contact
-      }),
+      body: formData,
     });
-
 
     const data = await response.json();
 

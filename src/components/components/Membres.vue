@@ -148,9 +148,12 @@
               <span class="dropdown-arrow">▾</span>
             </div>
 
+            
+            <!-- Affichage du menu avec les compteurs -->
             <div v-if="dropdownOpen" class="filter-dropdown-menu">
               <div 
                 class="dropdown-option all-option" 
+                :class="{ selected: !accountStatusFilter }"
                 @click.stop="selectOption('')">
                 Tous les comptes
               </div>
@@ -158,14 +161,9 @@
                 class="dropdown-option" 
                 :class="{ selected: accountStatusFilter === 'valid' }" 
                 @click.stop="selectOption('valid')">
-                Comptes valides
+                Comptes valides ({{ valid_accounts || 0 }})
               </div>
-              <div 
-                class="dropdown-option" 
-                :class="{ selected: accountStatusFilter === 'invalid' }" 
-                @click.stop="selectOption('invalid')">
-                Comptes invalides
-              </div>
+              
             </div>
           </div>
 
@@ -702,6 +700,24 @@
             <input type="text" v-model="editMembreData.contact"  required/>
           </div>
 
+          <div class="form-group">
+            <label>Je suis</label>
+            <small v-if="editMembreData.statut" class="text-gray-600">
+               <strong>{{ statut }}</strong>
+            </small>
+            <select v-model="editMembreData.statut" required>
+              <option value="">-- Sélectionner --</option>
+              <option value="CE_CE">CE_CE</option>
+              <option value="SC_SC">SC_SC</option>
+              <option value="SR_SR">SR_SR</option>
+              <option value="SR">SR</option>
+              <option value="SOUS_COMITE">SOUS_COMITE</option>
+              <option value="SECTION">SECTION</option>
+            </select>
+          </div>
+
+
+
           <div class="form-actions">
             <button type="button" class="cancel-btn" @click="closeEditModal">Annuler</button>
             <button type="submit" class="submit-btn" @click="updateMembre">💾 Enregistrer</button>
@@ -788,9 +804,10 @@ const selectOption = (option) => {
   loadMembres()
 }
 const selectedOptionText = computed(() => {
-  if (accountStatusFilter.value === 'valid') return 'Comptes valides'
-  if (accountStatusFilter.value === 'invalid') return 'Comptes invalides'
-  return ''
+  if (accountStatusFilter.value === 'valid') {
+    return `Comptes valides (${stats.value.valid_accounts || 0})`
+  } 
+  return 'Tous les comptes'
 })
 const toggleDropdown = () => {
   dropdownOpen.value = !dropdownOpen.value
@@ -839,7 +856,7 @@ const loadMembres = async () => {
       url += `&card_status=${encodeURIComponent(filters.value.card_status)}` 
     }
     if (accountStatusFilter.value) {
-     url += `&account_status=${accountStatusFilter.value}` // 'valid' ou 'invalid'
+     url += `&valid_accounts=${accountStatusFilter.value}` // 'valid' ou 'invalid'
     }
 
     
@@ -854,6 +871,7 @@ const loadMembres = async () => {
         prenom: membre.prenom,
         email: membre.email,
         contact: membre.contact || membre.contact,
+        je_suis:membre.statut,
         secretariatRegional: membre.region || membre.secretariat,
         sousComite: membre.sous_comite,
         section: membre.section,
@@ -1108,6 +1126,7 @@ const addMembre = async () => {
       secretariatRegional: '',
       sousComite: '',
       section: '',
+      je_suis:'',
       photo: null
     }
     
