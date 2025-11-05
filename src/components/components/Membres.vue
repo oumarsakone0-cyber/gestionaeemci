@@ -713,6 +713,8 @@
               <option value="SR">SR</option>
               <option value="SOUS_COMITE">SOUS_COMITE</option>
               <option value="SECTION">SECTION</option>
+              <option value="BUREAU_SECTION">BUREAU_SECTION</option>
+              <option value="MEMBRE_SIMPLE">MEMBRE_SIMPLE</option>
             </select>
           </div>
 
